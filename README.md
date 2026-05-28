@@ -92,6 +92,25 @@ require("pi").setup({
 | `context.diagnostics.enabled` | `false` | Includes Neovim diagnostics in the sent context. `:PiAsk` sends all buffer diagnostics; `:PiAskSelection` sends only diagnostics overlapping the selected lines. |
 | `skills` | `true` | Whether pi discovers and loads skills. Set to `false` to pass `--no-skills`. |
 | `extensions` | `true` | Whether pi discovers and loads extensions. Set to `false` to pass `--no-extensions`. |
+| `rpc.persistent` | `false` | Keep a long-lived `pi --mode rpc` subprocess. Each request reuses the same process instead of starting a new one. |
+| `rpc.start` | `"lazy"` | When to start the persistent process. `"lazy"` starts on first request; `"setup"` starts during `require("pi").setup()`. Only applies when `rpc.persistent = true`. |
+
+### Persistent RPC process
+
+By default pi.nvim starts a fresh `pi` process for every request. Enable the persistent RPC mode to reuse a single long-lived subprocess:
+
+```lua
+require("pi").setup({
+  rpc = {
+    persistent = true,
+    start = "lazy", -- or "setup"
+  },
+})
+```
+
+With `start = "lazy"` (default), the process starts on the first `:PiAsk` or `:PiAskSelection`. With `start = "setup"`, it starts during `setup()`.
+
+Use `:PiWarm`, `:PiStop`, `:PiRestart`, and `:PiStatus` to manage the persistent process manually.
 
 Use `pi --list-models` to see available models.
 
@@ -138,6 +157,10 @@ vim.keymap.set("v", "<leader>ai", ":PiAskSelection<CR>", { desc = "Ask pi (selec
 | `:PiAsk` | Normal | Prompt for input, sends it + current buffer as context |
 | `:PiAskSelection` | Visual | Same as :PiAsk but also sends selected lines as context |
 | `:PiCancel` | Normal | Cancel the active pi request immediately |
+| `:PiWarm` | Normal | Start the persistent pi RPC process (`rpc.persistent` must be `true`) |
+| `:PiStop` | Normal | Stop the persistent pi RPC process |
+| `:PiRestart` | Normal | Restart the persistent pi RPC process |
+| `:PiStatus` | Normal | Show whether the persistent pi RPC process is running |
 | `:PiLog` | Normal | Open the session log in a new split |
 
 ## Behavior

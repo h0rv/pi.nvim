@@ -31,6 +31,10 @@ M.defaults = {
   },
   skills = true,
   extensions = true,
+  rpc = {
+    persistent = false,
+    start = "lazy",
+  },
 }
 
 local values = vim.deepcopy(M.defaults)
@@ -97,6 +101,19 @@ function M.validate(opts)
   end
   if opts.extensions ~= nil and type(opts.extensions) ~= "boolean" then
     error("pi.nvim: extensions must be a boolean")
+  end
+  if opts.rpc ~= nil then
+    if type(opts.rpc) ~= "table" then
+      error("pi.nvim: rpc must be a table")
+    end
+    if opts.rpc.persistent ~= nil and type(opts.rpc.persistent) ~= "boolean" then
+      error("pi.nvim: rpc.persistent must be a boolean")
+    end
+    if opts.rpc.start ~= nil then
+      if type(opts.rpc.start) ~= "string" or (opts.rpc.start ~= "lazy" and opts.rpc.start ~= "setup") then
+        error('pi.nvim: rpc.start must be "lazy" or "setup"')
+      end
+    end
   end
   if opts.thinking ~= nil then
     if type(opts.thinking) ~= "string" then

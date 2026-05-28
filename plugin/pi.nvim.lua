@@ -29,3 +29,20 @@ end, { desc = "Cancel the active pi request" })
 vim.api.nvim_create_user_command("PiLog", function()
   require("pi").show_log()
 end, { desc = "Show pi session log" })
+
+-- Persistent RPC process management (requires rpc.persistent = true)
+vim.api.nvim_create_user_command("PiWarm", function()
+  require("pi").warm()
+end, { desc = "Start persistent pi RPC process" })
+
+vim.api.nvim_create_user_command("PiStop", function()
+  require("pi").stop()
+end, { desc = "Stop persistent pi RPC process" })
+
+vim.api.nvim_create_user_command("PiRestart", function()
+  require("pi").restart()
+end, { desc = "Restart persistent pi RPC process" })
+
+vim.api.nvim_create_user_command("PiStatus", function()
+  require("pi").status()
+end, { desc = "Show persistent pi RPC process status" })

@@ -4,6 +4,7 @@ local runner = require("pi.runner")
 local session_mod = require("pi.session")
 local ui = require("pi.ui")
 local log = require("pi.log")
+local rpc = require("pi.rpc")
 
 local M = {}
 
@@ -246,7 +247,7 @@ function M.run(opts)
 
   set_status(session, "starting")
 
-  local process, err = runner.start(session, cmd, payload, {
+  local handlers = {
     on_event = function(event)
       if not active_session or active_session ~= session or session.cancelled then
         return
@@ -297,19 +298,39 @@ function M.run(opts)
       end
       finish_session(session, "done")
     end,
-  })
+  }
 
-  if not process then
-    finish_session(session, "error", { error = tostring(err) })
-    return
+  local cfg = config.get()
+  if cfg.rpc.persistent then
+    if not rpc.is_running() then
+      local ok, spawn_err = rpc.start(cmd)
+      if not ok then
+        finish_session(session, "error", { error = "failed to start pi RPC: " .. tostring(spawn_err) })
+        return
+      end
+    end
+    rpc.prompt(payload, handlers)
+  else
+    local process, err = runner.start(session, cmd, payload, handlers)
+    if not process then
+      finish_session(session, "error", { error = tostring(err) })
+      return
+    end
+    session.process = process
   end
-
-  session.process = process
 end
 
 function M.setup(opts)
   assert_supported_version()
   config.setup(opts)
+  rpc._setup_autocmd()
+  local cfg = config.get()
+  if cfg.rpc.persistent and cfg.rpc.start == "setup" then
+    local ok, err = rpc.start(M.get_cmd())
+    if not ok then
+      vim.notify("pi.nvim: failed to start persistent RPC: " .. tostring(err), vim.log.levels.ERROR)
+    end
+  end
 end
 
 function M.prompt_with_buffer()
@@ -358,10 +379,75 @@ function M.cancel()
     return
   end
   active_session.cancelled = true
-  runner.cancel(active_session)
+  if config.get().rpc.persistent then
+    rpc.abort()
+  else
+    runner.cancel(active_session)
+  end
   last_session = active_session
   ui.close(active_session)
   active_session = nil
+end
+
+function M.warm()
+  local cfg = config.get()
+  if not cfg.rpc.persistent then
+    vim.notify("PiWarm requires rpc.persistent = true", vim.log.levels.WARN)
+    return
+  end
+  if rpc.is_running() then
+    vim.notify("pi RPC process is already running", vim.log.levels.INFO)
+    return
+  end
+  local ok, err = rpc.start(M.get_cmd())
+  if ok then
+    vim.notify("pi RPC process started", vim.log.levels.INFO)
+  else
+    vim.notify("failed to start pi RPC: " .. tostring(err), vim.log.levels.ERROR)
+  end
+end
+
+function M.stop()
+  local cfg = config.get()
+  if not cfg.rpc.persistent then
+    vim.notify("PiStop requires rpc.persistent = true", vim.log.levels.WARN)
+    return
+  end
+  if not rpc.is_running() then
+    vim.notify("pi RPC process is not running", vim.log.levels.INFO)
+    return
+  end
+  if active_session then
+    M.cancel()
+  end
+  rpc.stop()
+  vim.notify("pi RPC process stopped", vim.log.levels.INFO)
+end
+
+function M.restart()
+  local cfg = config.get()
+  if not cfg.rpc.persistent then
+    vim.notify("PiRestart requires rpc.persistent = true", vim.log.levels.WARN)
+    return
+  end
+  if active_session then
+    M.cancel()
+  end
+  local ok, err = rpc.restart()
+  if ok then
+    vim.notify("pi RPC process restarted", vim.log.levels.INFO)
+  else
+    vim.notify("failed to restart pi RPC: " .. tostring(err), vim.log.levels.ERROR)
+  end
+end
+
+function M.status()
+  local cfg = config.get()
+  if not cfg.rpc.persistent then
+    vim.notify("pi persistent RPC is disabled", vim.log.levels.INFO)
+    return
+  end
+  vim.notify(rpc.is_running() and "pi RPC process is running" or "pi RPC process is not running", vim.log.levels.INFO)
 end
 
 function M.is_running()
